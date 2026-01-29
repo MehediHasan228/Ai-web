@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Bell, Key, Check, Camera, LogOut, Eye, EyeOff } from 'lucide-react';
+import { User, Bell, Key, Check, Camera, LogOut, Eye, EyeOff, ChefHat, Clock, Flame, X } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
 const Settings = () => {
-    const { user, updateProfile, apiKeys, updateApiKeys, notifications, updateNotifications, logout } = useUser();
+    const { user, updateProfile, apiKeys, updateApiKeys, notifications, updateNotifications, userPreferences, updateUserPreferences, logout } = useUser();
 
     // --- Profile State ---
     const [profileData, setProfileData] = useState({ ...user });
@@ -18,13 +18,21 @@ const Settings = () => {
     // --- Notification State ---
     const [notifData, setNotifData] = useState({ ...notifications });
 
+    // --- Recipe Preferences State ---
+    const [prefsData, setPrefsData] = useState({ ...userPreferences });
+    const [isPrefsSaving, setIsPrefsSaving] = useState(false);
+
+    // Available options for preferences
+    const dietaryOptions = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'keto', 'paleo', 'seafood', 'low-carb'];
+    const cuisineOptions = ['Italian', 'Asian', 'Mediterranean', 'Mexican', 'Seafood', 'American', 'Indian', 'French', 'Thai', 'Japanese'];
+
     // Sync local state with context on mount
     useEffect(() => {
         setProfileData({ ...user });
         setKeysData({ ...apiKeys });
         setNotifData({ ...notifications });
-    }, [user, apiKeys, notifications]);
-
+        setPrefsData({ ...userPreferences });
+    }, [user, apiKeys, notifications, userPreferences]);
 
     // Handlers
     const handleProfileSave = () => {
@@ -59,8 +67,34 @@ const Settings = () => {
     const handleNotifChange = (key) => {
         const newData = { ...notifData, [key]: !notifData[key] };
         setNotifData(newData);
-        // Auto-save notifications
         updateNotifications(newData);
+    };
+
+    const handlePrefsSave = () => {
+        setIsPrefsSaving(true);
+        setTimeout(() => {
+            updateUserPreferences(prefsData);
+            setIsPrefsSaving(false);
+            alert("Recipe preferences updated! Match scores will recalculate.");
+        }, 800);
+    };
+
+    const toggleDietaryPref = (pref) => {
+        const current = prefsData.dietaryPreferences || [];
+        if (current.includes(pref)) {
+            setPrefsData({ ...prefsData, dietaryPreferences: current.filter(p => p !== pref) });
+        } else {
+            setPrefsData({ ...prefsData, dietaryPreferences: [...current, pref] });
+        }
+    };
+
+    const toggleCuisinePref = (cuisine) => {
+        const current = prefsData.cuisinePreferences || [];
+        if (current.includes(cuisine)) {
+            setPrefsData({ ...prefsData, cuisinePreferences: current.filter(c => c !== cuisine) });
+        } else {
+            setPrefsData({ ...prefsData, cuisinePreferences: [...current, cuisine] });
+        }
     };
 
     return (
@@ -135,6 +169,100 @@ const Settings = () => {
                         className="bg-dark text-white px-4 py-2 rounded-lg font-medium hover:bg-black transition-colors disabled:opacity-50"
                     >
                         {isProfileSaving ? 'Saving...' : 'Save Profile'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Recipe Preferences Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+                    <ChefHat className="w-5 h-5 text-gray-400" />
+                    <h2 className="font-semibold text-gray-800">Recipe Matching Preferences</h2>
+                </div>
+                <div className="p-6 space-y-6">
+                    {/* Dietary Preferences */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Dietary Preferences</label>
+                        <p className="text-xs text-gray-500 mb-3">Select dietary restrictions or preferences for recipe matching</p>
+                        <div className="flex flex-wrap gap-2">
+                            {dietaryOptions.map(pref => (
+                                <button
+                                    key={pref}
+                                    onClick={() => toggleDietaryPref(pref)}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${(prefsData.dietaryPreferences || []).includes(pref)
+                                            ? 'bg-primary text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {pref}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Cuisine Preferences */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Cuisines</label>
+                        <p className="text-xs text-gray-500 mb-3">Recipes matching these cuisines get higher match scores</p>
+                        <div className="flex flex-wrap gap-2">
+                            {cuisineOptions.map(cuisine => (
+                                <button
+                                    key={cuisine}
+                                    onClick={() => toggleCuisinePref(cuisine)}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${(prefsData.cuisinePreferences || []).includes(cuisine)
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {cuisine}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Time & Calorie Goals */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                <Clock className="w-4 h-4 mr-1" /> Max Cook Time (minutes)
+                            </label>
+                            <input
+                                type="range"
+                                min="15"
+                                max="120"
+                                step="5"
+                                value={prefsData.maxCookTime || 60}
+                                onChange={(e) => setPrefsData({ ...prefsData, maxCookTime: parseInt(e.target.value) })}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                            />
+                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>15 min</span>
+                                <span className="font-medium text-primary">{prefsData.maxCookTime || 60} min</span>
+                                <span>120 min</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                <Flame className="w-4 h-4 mr-1" /> Max Calories per Serving
+                            </label>
+                            <input
+                                type="number"
+                                value={prefsData.maxCalories || 800}
+                                onChange={(e) => setPrefsData({ ...prefsData, maxCalories: parseInt(e.target.value) || 0 })}
+                                placeholder="e.g., 600"
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Recipes under this limit score higher</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="px-6 py-4 bg-gray-50 text-right">
+                    <button
+                        onClick={handlePrefsSave}
+                        disabled={isPrefsSaving}
+                        className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                    >
+                        {isPrefsSaving ? 'Saving...' : 'Save Preferences'}
                     </button>
                 </div>
             </div>

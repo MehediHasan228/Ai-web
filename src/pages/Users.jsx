@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Filter, MoreHorizontal, Ban, CheckCircle, Download, UserPlus, Trash2, Edit2, X, ChevronLeft, ChevronRight, Mail, User } from 'lucide-react';
+import { useUI } from '../context/UIContext';
 
 const Users = () => {
     // Mock Data Generator
@@ -15,7 +16,7 @@ const Users = () => {
     ];
 
     const [users, setUsers] = useState(generateUsers());
-    const [searchQuery, setSearchQuery] = useState('');
+    const { searchQuery, setSearchQuery, debouncedSearchQuery } = useUI();
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(5);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,10 +35,10 @@ const Users = () => {
     // Form State for Add/Edit
     const [formData, setFormData] = useState({ name: '', email: '', role: 'User', plan: 'Free', status: 'Active' });
 
-    // Filter Logic
+    // Filter Logic (using global debounced search)
     const filteredUsers = users.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = user.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            user.email.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
         const matchesRole = filters.role === 'All' || user.role === filters.role;
         const matchesStatus = filters.status === 'All' || user.status === filters.status;
         const matchesPlan = filters.plan === 'All' || user.plan === filters.plan;
@@ -153,8 +154,8 @@ const Users = () => {
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsFilterOpen(!isFilterOpen); }}
                             className={`flex items-center px-4 py-2.5 border rounded-lg transition-colors ${isFilterOpen || Object.values(filters).some(v => v !== 'All')
-                                    ? 'border-primary text-primary bg-primary/5'
-                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                ? 'border-primary text-primary bg-primary/5'
+                                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                 }`}
                         >
                             <Filter className="w-5 h-5 mr-2" />
@@ -251,7 +252,7 @@ const Users = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                                user.status === 'Banned' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                            user.status === 'Banned' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                                             }`}>
                                             {user.status === 'Active' ? <CheckCircle className="w-3 h-3 mr-1" /> : <Ban className="w-3 h-3 mr-1" />}
                                             {user.status}

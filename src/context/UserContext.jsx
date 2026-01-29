@@ -30,6 +30,14 @@ export const UserProvider = ({ children }) => {
         systemPrompt: "You are an expert chef and nutritional planner. Create meal plans that are efficient, cost-effective, and adhere strictly to the user's dietary restrictions."
     });
 
+    // User Preferences for Recipe Matching
+    const [userPreferences, setUserPreferences] = useState({
+        dietaryPreferences: ['seafood', 'gluten-free'],
+        cuisinePreferences: ['Italian', 'Asian', 'Mediterranean'],
+        maxCookTime: 60, // minutes
+        maxCalories: 800  // kcal
+    });
+
     const updateProfile = (updates) => {
         setUser(prev => ({ ...prev, ...updates }));
     };
@@ -46,11 +54,13 @@ export const UserProvider = ({ children }) => {
         setAiConfig(prev => ({ ...prev, ...config }));
     };
 
+    const updateUserPreferences = (prefs) => {
+        setUserPreferences(prev => ({ ...prev, ...prefs }));
+    };
+
     const logout = () => {
-        // In a real app, this would clear tokens/session
         if (window.confirm("Are you sure you want to log out?")) {
             alert("Logging out... (This would redirect to login)");
-            // For now, maybe reset state or navigate
         }
     };
 
@@ -64,6 +74,8 @@ export const UserProvider = ({ children }) => {
             updateNotifications,
             aiConfig,
             updateAiConfig,
+            userPreferences,
+            updateUserPreferences,
             logout
         }}>
             {children}
