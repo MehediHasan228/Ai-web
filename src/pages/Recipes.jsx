@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { Search, Filter, Plus, ExternalLink, Clock, Flame, ChefHat, X, Edit2, Eye, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Search, Filter, Plus, ExternalLink, Clock, Flame, ChefHat, X, Edit2, Eye, Trash2, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Recipes = () => {
     const navigate = useNavigate();
+
+    // Cuisine List (dynamic)
+    const [cuisines, setCuisines] = useState([
+        'Italian', 'Asian', 'Mediterranean', 'Mexican', 'Seafood', 'American'
+    ]);
 
     // Mock Data
     const initialRecipes = [
@@ -28,8 +33,12 @@ const Recipes = () => {
 
     // Modal States
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [currentRecipe, setCurrentRecipe] = useState(null); // Used for both Edit and View
+    const [currentRecipe, setCurrentRecipe] = useState(null);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
+    // Add Cuisine Modal State
+    const [isAddCuisineOpen, setIsAddCuisineOpen] = useState(false);
+    const [newCuisineName, setNewCuisineName] = useState('');
 
     // Form State (for adding/editing)
     const [formData, setFormData] = useState({
@@ -37,8 +46,8 @@ const Recipes = () => {
         cuisine: 'Italian',
         time: '',
         calories: '',
-        image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=500&q=80', // Default placeholder
-        match: 100 // Default for new manuals
+        image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=500&q=80',
+        match: 100
     });
 
     // Filtering Logic
@@ -47,7 +56,6 @@ const Recipes = () => {
             recipe.cuisine.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCuisine = selectedCuisine === 'All Cuisines' || recipe.cuisine === selectedCuisine;
 
-        // Advanced Filters
         let matchesTime = true;
         if (filters.time === '< 15 min') matchesTime = recipe.time < 15;
         if (filters.time === '< 30 min') matchesTime = recipe.time < 30;
@@ -75,7 +83,7 @@ const Recipes = () => {
     const handleAddNew = () => {
         setFormData({
             title: '',
-            cuisine: 'Italian',
+            cuisine: cuisines[0] || 'Italian',
             time: '',
             calories: '',
             image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=500&q=80',
@@ -111,10 +119,8 @@ const Recipes = () => {
         };
 
         if (currentRecipe) {
-            // Update existing
             setRecipes(recipes.map(r => r.id === currentRecipe.id ? { ...r, ...finalData } : r));
         } else {
-            // Add new
             const newRecipe = {
                 id: Date.now(),
                 ...finalData
@@ -122,6 +128,19 @@ const Recipes = () => {
             setRecipes([...recipes, newRecipe]);
         }
         setIsEditModalOpen(false);
+    };
+
+    // Add Cuisine Handler
+    const handleAddCuisine = () => {
+        const trimmedName = newCuisineName.trim();
+        if (trimmedName && !cuisines.includes(trimmedName)) {
+            setCuisines([...cuisines, trimmedName]);
+            setFormData({ ...formData, cuisine: trimmedName });
+            setNewCuisineName('');
+            setIsAddCuisineOpen(false);
+        } else if (cuisines.includes(trimmedName)) {
+            alert('This cuisine already exists!');
+        }
     };
 
     return (
@@ -159,20 +178,17 @@ const Recipes = () => {
                         className="px-4 py-2.5 border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:border-primary"
                     >
                         <option>All Cuisines</option>
-                        <option>Italian</option>
-                        <option>Asian</option>
-                        <option>Mediterranean</option>
-                        <option>Seafood</option>
-                        <option>Mexican</option>
-                        <option>American</option>
+                        {cuisines.map(c => (
+                            <option key={c}>{c}</option>
+                        ))}
                     </select>
 
                     <div className="relative">
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsFilterOpen(!isFilterOpen); }}
                             className={`flex items-center px-4 py-2.5 border rounded-lg transition-colors ${isFilterOpen || Object.values(filters).some(v => v !== 'All')
-                                    ? 'border-primary text-primary bg-primary/5'
-                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                ? 'border-primary text-primary bg-primary/5'
+                                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                 }`}
                         >
                             <Filter className="w-5 h-5 mr-2" />
@@ -229,8 +245,8 @@ const Recipes = () => {
                                                     key={opt}
                                                     onClick={() => setFilters({ ...filters, match: opt })}
                                                     className={`px-3 py-1 text-xs rounded-full border transition-colors ${filters.match === opt
-                                                            ? 'bg-primary text-white border-primary'
-                                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                        ? 'bg-primary text-white border-primary'
+                                                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                                         }`}
                                                 >
                                                     {opt}
@@ -254,7 +270,6 @@ const Recipes = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredRecipes.map((recipe) => (
                     <div key={recipe.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group relative">
-                        {/* Hover Delete Button */}
                         <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(recipe.id); }}
                             className="absolute top-2 left-2 z-10 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
@@ -389,18 +404,25 @@ const Recipes = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Cuisine</label>
-                                    <select
-                                        className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white"
-                                        value={formData.cuisine}
-                                        onChange={e => setFormData({ ...formData, cuisine: e.target.value })}
-                                    >
-                                        <option>Italian</option>
-                                        <option>Asian</option>
-                                        <option>Mediterranean</option>
-                                        <option>Mexican</option>
-                                        <option>Seafood</option>
-                                        <option>American</option>
-                                    </select>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-primary"
+                                            value={formData.cuisine}
+                                            onChange={e => setFormData({ ...formData, cuisine: e.target.value })}
+                                        >
+                                            {cuisines.map(c => (
+                                                <option key={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAddCuisineOpen(true)}
+                                            className="p-2 border border-dashed border-gray-300 rounded-lg text-primary hover:bg-primary/5 hover:border-primary transition-colors"
+                                            title="Add New Cuisine"
+                                        >
+                                            <PlusCircle className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="relative">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Cook Time (min)</label>
@@ -438,6 +460,62 @@ const Recipes = () => {
                                 <button type="submit" className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-emerald-600 font-medium">Save Recipe</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Cuisine Modal */}
+            {isAddCuisineOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-gray-800">Add New Cuisine</h3>
+                            <button onClick={() => { setIsAddCuisineOpen(false); setNewCuisineName(''); }} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cuisine Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Indian, French, Thai..."
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary"
+                                    value={newCuisineName}
+                                    onChange={e => setNewCuisineName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCuisine(); } }}
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Current Cuisines */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Existing Cuisines</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {cuisines.map(c => (
+                                        <span key={c} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md">{c}</span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsAddCuisineOpen(false); setNewCuisineName(''); }}
+                                    className="flex-1 py-2 border rounded-lg hover:bg-gray-50 text-gray-600 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleAddCuisine}
+                                    disabled={!newCuisineName.trim()}
+                                    className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-emerald-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Add Cuisine
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
