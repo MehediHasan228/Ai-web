@@ -8,6 +8,7 @@ import Inventory from './pages/Inventory';
 import Grocery from './pages/Grocery';
 import AIControls from './pages/AIControls';
 import Settings from './pages/Settings';
+import Database from './pages/Database';
 import Login from './pages/Login';
 
 import { UserProvider } from './context/UserContext';
@@ -37,12 +38,34 @@ function App() {
                   }
                 >
                   <Route index element={<Dashboard />} />
-                  <Route path="users" element={<Users />} />
+                  <Route
+                    path="users"
+                    element={
+                      <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                        <Users />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="recipes" element={<Recipes />} />
                   <Route path="inventory" element={<Inventory />} />
                   <Route path="grocery" element={<Grocery />} />
-                  <Route path="ai-controls" element={<AIControls />} />
+                  <Route
+                    path="ai-controls"
+                    element={
+                      <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                        <AIControls />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="settings" element={<Settings />} />
+                  <Route
+                    path="database"
+                    element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <Database />
+                      </ProtectedRoute>
+                    }
+                  />
                 </Route>
 
                 {/* Catch-all redirect */}

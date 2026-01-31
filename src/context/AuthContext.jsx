@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -12,21 +13,24 @@ export const AuthProvider = ({ children }) => {
         checkAuth();
     }, []);
 
-    const checkAuth = () => {
+    const checkAuth = async () => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('savora_auth_token');
-            const userData = localStorage.getItem('savora_user');
+            const token = localStorage.getItem('token');
 
-            if (token && userData) {
+            if (token) {
+                // Fetch fresh profile from backend
+                const response = await authService.getProfile();
                 setIsAuthenticated(true);
-                setAuthUser(JSON.parse(userData));
+                setAuthUser(response.data);
             } else {
                 setIsAuthenticated(false);
                 setAuthUser(null);
             }
         } catch (error) {
             console.error('Auth check error:', error);
+            // If profile fetch fails (e.g. token expired), clear storage
+            localStorage.removeItem('token');
             setIsAuthenticated(false);
             setAuthUser(null);
         } finally {
@@ -38,50 +42,40 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         setIsLoading(true);
         try {
-            // Simulate API call - replace with actual auth logic
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            // Mock successful login
-            const mockUser = {
-                id: '1',
-                email: email,
-                name: 'Admin User',
-                role: 'Admin'
-            };
-            const mockToken = 'mock_jwt_token_' + Date.now();
+            const response = await authService.login({ email, password });
+            const { token, ...userData } = response.data;
 
             // Store in localStorage
-            localStorage.setItem('savora_auth_token', mockToken);
-            localStorage.setItem('savora_user', JSON.stringify(mockUser));
+            localStorage.setItem('token', token);
 
-            setAuthUser(mockUser);
+            setAuthUser(userData);
             setIsAuthenticated(true);
             setIsLoading(false);
 
             return { success: true };
         } catch (error) {
             setIsLoading(false);
-            return { success: false, error: error.message };
+            const message = error.response?.data?.message || error.message;
+            return { success: false, error: message };
         }
+    };
+
+    // Update profile in context
+    const updateUser = (userData) => {
+        setAuthUser(prev => ({ ...prev, ...userData }));
     };
 
     // Logout function
     const logout = () => {
-        // Clear all auth data
-        localStorage.removeItem('savora_auth_token');
-        localStorage.removeItem('savora_user');
-
-        // Reset state
+        localStorage.removeItem('token');
         setIsAuthenticated(false);
         setAuthUser(null);
-
-        // Return true to indicate successful logout
         return true;
     };
 
     // Get current token
     const getToken = () => {
-        return localStorage.getItem('savora_auth_token');
+        return localStorage.getItem('token');
     };
 
     return (
@@ -91,6 +85,7 @@ export const AuthProvider = ({ children }) => {
             authUser,
             login,
             logout,
+            updateUser,
             getToken,
             checkAuth
         }}>

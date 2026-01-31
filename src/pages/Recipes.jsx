@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Plus, ExternalLink, Clock, Flame, ChefHat, X, Edit2, Eye, Trash2, PlusCircle, Info, Youtube, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
@@ -7,30 +8,25 @@ import { useUI } from '../context/UIContext';
 import { calculateMatchScore, getMatchColor, getMatchBreakdown } from '../utils/matchCalculator';
 import { fetchYoutubePlaylist } from '../services/recipeApi';
 import RecipeVideoCard from '../components/RecipeVideoCard';
+import { externalRecipeService, recipeService } from '../services/api';
 
 const Recipes = () => {
     const navigate = useNavigate();
     const { getInventoryNames } = useInventory();
     const { userPreferences } = useUser();
     const { searchQuery, setSearchQuery, debouncedSearchQuery } = useUI();
+    const { authUser } = useAuth();
+    const isAdmin = authUser?.role?.toLowerCase() === 'admin';
+    const isManager = authUser?.role?.toLowerCase() === 'manager';
+    const canEdit = isAdmin || isManager;
 
     // Cuisine List (dynamic)
     const [cuisines, setCuisines] = useState([
         'Italian', 'Asian', 'Mediterranean', 'Mexican', 'Seafood', 'American'
     ]);
 
-    // Mock Data (without static match values)
-    const initialRecipes = [
-        { id: 1, title: 'Mediterranean Quinoa Salad', calories: 320, time: 25, cuisine: 'Mediterranean', image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&q=80', ingredients: ['Quinoa', 'Cucumber', 'Tomatoes', 'Feta Cheese'], instructions: 'Boil quinoa. Chop veggies. Mix everything.' },
-        { id: 2, title: 'Garlic Butter Salmon', calories: 450, time: 35, cuisine: 'Seafood', image: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&q=80', ingredients: ['Salmon', 'Butter', 'Garlic', 'Lemon'], instructions: 'Pan sear salmon. Baste with garlic butter.' },
-        { id: 3, title: 'Vegetable Stir Fry', calories: 280, time: 20, cuisine: 'Asian', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&q=80', ingredients: ['Broccoli', 'Carrots', 'Soy Sauce', 'Tofu'], instructions: 'Stir fry veggies. Add sauce. Serve hot.' },
-        { id: 4, title: 'Chicken Parmesan', calories: 600, time: 50, cuisine: 'Italian', image: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=500&q=80', ingredients: ['Chicken Breast', 'Marinara Sauce', 'Mozzarella', 'Breadcrumbs'], instructions: 'Bread chicken. Fry. Bake with cheese.' },
-        { id: 5, title: 'Avocado Toast', calories: 220, time: 10, cuisine: 'American', image: 'https://images.unsplash.com/photo-1588137372308-15f75323a51d?w=500&q=80', ingredients: ['Bread', 'Avocado', 'Salt', 'Pepper'], instructions: 'Toast bread. Mash avocado. Spread.' },
-        { id: 6, title: 'Pasta Marinara', calories: 480, time: 30, cuisine: 'Italian', image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=500&q=80', ingredients: ['Pasta', 'Tomato Sauce', 'Olive Oil', 'Garlic'], instructions: 'Boil pasta. Make sauce. Combine.' },
-        { id: 7, title: 'Rice Bowl', calories: 350, time: 25, cuisine: 'Asian', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80', ingredients: ['Rice', 'Tofu', 'Broccoli', 'Soy Sauce'], instructions: 'Cook rice. Stir fry toppings. Assemble.' },
-    ];
-
-    const [recipes, setRecipes] = useState(initialRecipes);
+    const [recipes, setRecipes] = useState([]);
+    const [isRecipesLoading, setIsRecipesLoading] = useState(true);
     const [selectedCuisine, setSelectedCuisine] = useState('All Cuisines');
 
     // Filter State
@@ -61,30 +57,82 @@ const Recipes = () => {
         ingredients: []
     });
 
-    const [activeTab, setActiveTab] = useState('manual'); // 'manual' or 'video'
+    const [activeTab, setActiveTab] = useState('manual'); // 'manual', 'online', or 'video'
     const [videoRecipes, setVideoRecipes] = useState([]);
     const [isVideoLoading, setIsVideoLoading] = useState(false);
     const [videoError, setVideoError] = useState(null);
+    const [visibleVideos, setVisibleVideos] = useState(12); // Pagination state
+    const [isMockData, setIsMockData] = useState(false);
 
-    // Fetch Video Recipes
+    // Fetch Manual Recipes
     useEffect(() => {
-        const loadVideos = async () => {
+        fetchRecipes();
+    }, []);
+
+    const fetchRecipes = async () => {
+        setIsRecipesLoading(true);
+        try {
+            const response = await recipeService.getAll();
+            setRecipes(response.data);
+        } catch (error) {
+            console.error('Failed to fetch recipes:', error);
+        } finally {
+            setIsRecipesLoading(false);
+        }
+    };
+
+    // Fetch YouTube Tutorials
+    const fetchYoutubeVideos = async () => {
+        setIsVideoLoading(true);
+        setVideoError(null);
+        try {
+            const data = await fetchYoutubePlaylist();
+            setVideoRecipes(data);
+        } catch (error) {
+            console.error('Failed to fetch YouTube videos:', error);
+            setVideoError('Failed to load video tutorials. Please try again later.');
+        } finally {
+            setIsVideoLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const loadExternal = async () => {
             setIsVideoLoading(true);
             setVideoError(null);
             try {
-                const data = await fetchYoutubePlaylist();
-                setVideoRecipes(data);
+                const params = {
+                    query: debouncedSearchQuery || 'healthy',
+                    diet: userPreferences.dietaryRestrictions?.join(','),
+                };
+                const response = await externalRecipeService.search(params);
+                setVideoRecipes(response.data.results.map(r => ({
+                    id: r.id,
+                    title: r.title,
+                    image: r.image,
+                    time: r.readyInMinutes,
+                    calories: r.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 0,
+                    cuisine: r.cuisines?.[0] || 'Unknown',
+                    ingredients: r.analyzedInstructions?.[0]?.steps?.flatMap(s => s.ingredients?.map(i => i.name)) || [],
+                    instructions: r.analyzedInstructions?.[0]?.steps?.map(s => s.step).join(' ') || ''
+                })));
+                setIsMockData(response.data.isMock || false);
             } catch (err) {
-                setVideoError('Failed to load video recipes. Please try again later.');
+                setVideoError('Failed to load online recipes. Please check your Spoonacular API key in Settings.');
+                console.error(err);
             } finally {
                 setIsVideoLoading(false);
             }
         };
 
-        if (activeTab === 'video') {
-            loadVideos();
+        if (activeTab === 'online') {
+            loadExternal();
+            setVisibleVideos(12);
+        } else if (activeTab === 'video') {
+            fetchYoutubeVideos();
+            setVisibleVideos(12);
         }
-    }, [activeTab]);
+    }, [activeTab, debouncedSearchQuery, userPreferences]);
 
     // Get inventory names for matching
     const inventoryNames = useMemo(() => getInventoryNames(), [getInventoryNames]);
@@ -134,7 +182,8 @@ const Recipes = () => {
             time: '',
             calories: '',
             image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=500&q=80',
-            ingredients: []
+            ingredients: [],
+            instructions: ''
         });
         setCurrentRecipe(null);
         setIsEditModalOpen(true);
@@ -152,41 +201,49 @@ const Recipes = () => {
         setIsViewModalOpen(true);
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Delete this recipe?')) {
-            setRecipes(recipes.filter(r => r.id !== id));
+            try {
+                await recipeService.delete(id);
+                setRecipes(recipes.filter(r => r.id !== id));
+            } catch (error) {
+                console.error('Failed to delete recipe:', error);
+            }
         }
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-        const finalData = {
-            ...formData,
-            time: parseInt(formData.time) || 0,
-            calories: parseInt(formData.calories) || 0
-        };
-
-        if (currentRecipe) {
-            setRecipes(recipes.map(r => r.id === currentRecipe.id ? { ...r, ...finalData } : r));
-        } else {
-            const newRecipe = {
-                id: Date.now(),
-                ...finalData
-            };
-            setRecipes([...recipes, newRecipe]);
+        try {
+            if (currentRecipe) {
+                const response = await recipeService.update(currentRecipe.id, formData);
+                setRecipes(recipes.map(r => r.id === currentRecipe.id ? response.data : r));
+            } else {
+                const response = await recipeService.create(formData);
+                setRecipes([response.data, ...recipes]);
+            }
+            setIsEditModalOpen(false);
+        } catch (error) {
+            console.error('Failed to save recipe:', error);
         }
-        setIsEditModalOpen(false);
     };
 
-    const handleAddCuisine = () => {
-        const trimmedName = newCuisineName.trim();
-        if (trimmedName && !cuisines.includes(trimmedName)) {
-            setCuisines([...cuisines, trimmedName]);
-            setFormData({ ...formData, cuisine: trimmedName });
-            setNewCuisineName('');
-            setIsAddCuisineOpen(false);
-        } else if (cuisines.includes(trimmedName)) {
-            alert('This cuisine already exists!');
+    const handleSaveFromExternal = async (recipe) => {
+        try {
+            await recipeService.create({
+                title: recipe.title,
+                cuisine: recipe.cuisine,
+                time: recipe.time,
+                calories: recipe.calories,
+                image: recipe.image,
+                ingredients: recipe.ingredients,
+                instructions: recipe.instructions
+            });
+            alert(`"${recipe.title}" saved to your recipes!`);
+            fetchRecipes(); // Refresh manual list
+        } catch (error) {
+            console.error('Failed to save external recipe:', error);
+            alert('Failed to save recipe.');
         }
     };
 
@@ -200,13 +257,15 @@ const Recipes = () => {
                     <h1 className="text-2xl font-bold text-gray-800">Recipe Management</h1>
                     <p className="text-gray-500 mt-1">Discover, add, or edit recipes for the platform</p>
                 </div>
-                <button
-                    onClick={handleAddNew}
-                    className="bg-primary text-white px-5 py-2.5 rounded-lg font-medium shadow-sm hover:bg-emerald-600 transition-colors flex items-center justify-center"
-                >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Add Manual Recipe
-                </button>
+                {canEdit && (
+                    <button
+                        onClick={handleAddNew}
+                        className="bg-primary text-white px-5 py-2.5 rounded-lg font-medium shadow-sm hover:bg-emerald-600 transition-colors flex items-center justify-center"
+                    >
+                        <Plus className="w-5 h-5 mr-2" />
+                        Add Manual Recipe
+                    </button>
+                )}
             </div>
 
             {/* Tab Navigation */}
@@ -214,8 +273,8 @@ const Recipes = () => {
                 <button
                     onClick={() => setActiveTab('manual')}
                     className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'manual'
-                            ? 'text-primary'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-primary'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
@@ -227,14 +286,29 @@ const Recipes = () => {
                     )}
                 </button>
                 <button
-                    onClick={() => setActiveTab('video')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'video'
-                            ? 'text-primary'
-                            : 'text-gray-500 hover:text-gray-700'
+                    onClick={() => setActiveTab('online')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'online'
+                        ? 'text-primary'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
-                        <Youtube className="w-4 h-4" />
+                        <Search className="w-4 h-4" />
+                        Online Search
+                    </div>
+                    {activeTab === 'online' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('video')}
+                    className={`px-6 py-3 text-sm font-medium transition-colors relative ${activeTab === 'video'
+                        ? 'text-primary'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Play className="w-4 h-4" />
                         Video Tutorials
                     </div>
                     {activeTab === 'video' && (
@@ -249,7 +323,7 @@ const Recipes = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                         type="text"
-                        placeholder={activeTab === 'manual' ? "Search manual recipes..." : "Search video tutorials..."}
+                        placeholder={activeTab === 'manual' ? "Search manual recipes..." : activeTab === 'online' ? "Search online recipes..." : "Search video tutorials..."}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -360,13 +434,15 @@ const Recipes = () => {
                         const matchColor = getMatchColor(recipe.match);
                         return (
                             <div key={recipe.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group relative">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(recipe.id); }}
-                                    className="absolute top-2 left-2 z-10 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {canEdit && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDelete(recipe.id); }}
+                                        className="absolute top-2 left-2 z-10 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                                        title="Delete"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
 
                                 <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => handleView(recipe)}>
                                     <img
@@ -397,9 +473,11 @@ const Recipes = () => {
                                     </div>
 
                                     <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2">
-                                        <button onClick={() => handleEdit(recipe)} className="flex-1 text-sm font-medium text-gray-600 bg-gray-50 py-2 rounded-lg hover:bg-gray-100 flex items-center justify-center gap-2">
-                                            <Edit2 className="w-4 h-4" /> Edit
-                                        </button>
+                                        {canEdit && (
+                                            <button onClick={() => handleEdit(recipe)} className="flex-1 text-sm font-medium text-gray-600 bg-gray-50 py-2 rounded-lg hover:bg-gray-100 flex items-center justify-center gap-2">
+                                                <Edit2 className="w-4 h-4" /> Edit
+                                            </button>
+                                        )}
                                         <button onClick={() => handleView(recipe)} className="flex-1 text-sm font-medium text-primary bg-primary/10 py-2 rounded-lg hover:bg-primary/20 flex items-center justify-center gap-2">
                                             <Eye className="w-4 h-4" /> View
                                         </button>
@@ -429,17 +507,97 @@ const Recipes = () => {
                                 Try Again
                             </button>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {videoRecipes
-                                .filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))
-                                .map(video => (
-                                    <RecipeVideoCard key={video.id} video={video} />
-                                ))
-                            }
-                            {videoRecipes.filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())).length === 0 && (
+                    ) : activeTab === 'online' ? (
+                        <div className="space-y-6">
+                            {isMockData && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+                                            <Info className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-amber-900 text-sm">Demo Mode Active</h4>
+                                            <p className="text-amber-700 text-xs">A Spoonacular API key was not found. Showing high-quality sample recipes for demonstration.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate('/settings')}
+                                        className="text-xs font-bold text-amber-700 hover:underline uppercase tracking-wider"
+                                    >
+                                        Add API Key
+                                    </button>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {videoRecipes
+                                    .slice(0, visibleVideos)
+                                    .map(video => (
+                                        <div key={video.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group">
+                                            <div className="relative h-40">
+                                                <img src={video.image} alt={video.title} className="w-full h-full object-cover" />
+                                                <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded font-bold">
+                                                    SPOONACULAR
+                                                </div>
+                                            </div>
+                                            <div className="p-4">
+                                                <h4 className="font-bold text-gray-800 text-sm line-clamp-2 mb-3 h-10">{video.title}</h4>
+                                                <div className="flex items-center justify-between text-[10px] text-gray-400 mb-4">
+                                                    <span>{video.time} min</span>
+                                                    <span>{video.calories} kcal</span>
+                                                </div>
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => handleSaveFromExternal(video)}
+                                                        className="w-full py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <PlusCircle className="w-3 h-3" /> SAVE TO MY RECIPES
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+
+                            {videoRecipes.filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())).length === 0 ? (
                                 <div className="col-span-full text-center py-12 text-gray-500">
-                                    No video recipes match your search.
+                                    No online recipes match your search.
+                                </div>
+                            ) : videoRecipes.filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())).length > visibleVideos && (
+                                <div className="flex justify-center pt-4">
+                                    <button
+                                        onClick={() => setVisibleVideos(prev => prev + 12)}
+                                        className="px-8 py-3 bg-white border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 hover:border-primary hover:text-primary transition-all shadow-sm flex items-center gap-2"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        Load More Results
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {videoRecipes
+                                    .slice(0, visibleVideos)
+                                    .map(video => (
+                                        <RecipeVideoCard key={video.id} video={video} />
+                                    ))
+                                }
+                            </div>
+                            {videoRecipes.filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())).length === 0 ? (
+                                <div className="col-span-full text-center py-12 text-gray-500">
+                                    No video tutorials match your search.
+                                </div>
+                            ) : videoRecipes.filter(v => v.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())).length > visibleVideos && (
+                                <div className="flex justify-center pt-4">
+                                    <button
+                                        onClick={() => setVisibleVideos(prev => prev + 12)}
+                                        className="px-8 py-3 bg-white border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 hover:border-primary hover:text-primary transition-all shadow-sm flex items-center gap-2"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        Load More Tutorials
+                                    </button>
                                 </div>
                             )}
                         </div>

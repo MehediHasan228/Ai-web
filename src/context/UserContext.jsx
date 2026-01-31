@@ -1,15 +1,43 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
+    const { authUser } = useAuth();
+
     // Core Profile Data
     const [user, setUser] = useState({
-        name: 'Robert Fox',
-        email: 'admin@savora.app',
-        role: 'Admin Workspace',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+        name: 'Admin User',
+        email: 'admin@savora.com',
+        role: 'admin',
+        avatar: '' // Default will be handled in UI
     });
+
+    // Sync user with authUser from AuthContext
+    useEffect(() => {
+        if (authUser) {
+            setUser(prev => ({
+                ...prev,
+                name: authUser.name || prev.name,
+                email: authUser.email || prev.email,
+                role: authUser.role || prev.role,
+                avatar: authUser.avatar || '',
+                openaiKey: authUser.openaiKey,
+                spoonacularKey: authUser.spoonacularKey,
+                preferences: authUser.preferences
+            }));
+
+            setApiKeys({
+                openai: authUser.openaiKey || '',
+                spoonacular: authUser.spoonacularKey || ''
+            });
+
+            if (authUser.preferences) {
+                setUserPreferences(authUser.preferences);
+            }
+        }
+    }, [authUser]);
 
     // API Configuration
     const [apiKeys, setApiKeys] = useState({

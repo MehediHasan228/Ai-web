@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Save, RotateCcw, Send, Bot, User as UserIcon } from 'lucide-react';
 import { useUser } from '../context/UserContext';
+import { aiService } from '../services/api';
 
 const AIControls = () => {
     const { aiConfig, updateAiConfig } = useUser();
@@ -51,7 +52,7 @@ const AIControls = () => {
         }
     };
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!inputMessage.trim()) return;
 
@@ -60,22 +61,21 @@ const AIControls = () => {
         setInputMessage('');
         setIsTyping(true);
 
-        // Mock AI Response Logic
-        setTimeout(() => {
-            let aiResponse = "I'm not sure how to help with that. Could you ask about recipes or meal planning?";
-            const lowerInput = userMsg.content.toLowerCase();
+        try {
+            const response = await aiService.chat({
+                messages: chatHistory.concat(userMsg),
+                systemPrompt: config.systemPrompt,
+                temperature: config.temperature
+            });
 
-            if (lowerInput.includes('recipe') || lowerInput.includes('cook') || lowerInput.includes('make')) {
-                aiResponse = "I can definitely help with that! Based on your request, I'd recommend a quick stir-fry. Would you like the full ingredients list?";
-            } else if (lowerInput.includes('diet') || lowerInput.includes('keto') || lowerInput.includes('vegan')) {
-                aiResponse = "Acknowledged. I will strictly filter all future recommendations to adhere to your specified dietary restrictions.";
-            } else if (lowerInput.includes('hello') || lowerInput.includes('hi')) {
-                aiResponse = "Hello! I am your Savora AI assistant. What are we cooking today?";
-            }
-
-            setChatHistory(prev => [...prev, { role: 'ai', content: aiResponse }]);
+            setChatHistory(prev => [...prev, { role: 'ai', content: response.data.content }]);
+        } catch (error) {
+            console.error('AI Error:', error);
+            const errorMsg = error.response?.data?.message || 'Failed to connect to AI engine. Please check your API key.';
+            setChatHistory(prev => [...prev, { role: 'ai', content: `Error: ${errorMsg}` }]);
+        } finally {
             setIsTyping(false);
-        }, 1500); // Simulate network delay
+        }
     };
 
     return (
@@ -178,8 +178,8 @@ const AIControls = () => {
                                     {msg.role === 'user' ? <UserIcon className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                                 </div>
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-gray-800 text-white rounded-br-none'
-                                        : 'bg-white border border-gray-200 text-gray-700 rounded-bl-none shadow-sm'
+                                    ? 'bg-gray-800 text-white rounded-br-none'
+                                    : 'bg-white border border-gray-200 text-gray-700 rounded-bl-none shadow-sm'
                                     }`}>
                                     <p className="whitespace-pre-wrap">{msg.content}</p>
                                 </div>

@@ -1,18 +1,53 @@
-import React, { useState } from 'react';
-import { Search, Plus, Trash2, AlertCircle, Calendar, X, Edit2, Minus, Check, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Plus, Trash2, AlertCircle, Calendar, X, Edit2, Minus, Check, AlertTriangle, ArrowUpDown, Sparkles } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useUI } from '../context/UIContext';
 import EditInventoryModal from '../components/EditInventoryModal';
+import ExpiryBadge from '../components/ExpiryBadge';
+import AIAnalysisModal from '../components/AIAnalysisModal';
+import { aiService } from '../services/api';
 
 const Inventory = () => {
     const { inventory, addItem, removeItem, updateItem, getStatus } = useInventory();
     const { searchQuery, setSearchQuery, debouncedSearchQuery } = useUI();
     const [activeTab, setActiveTab] = useState('Pantry');
+    const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null, name: '' });
     const [successMessage, setSuccessMessage] = useState('');
+
+    // AI Analysis State
+    const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState([]);
+
+    const handleAnalyze = async () => {
+        setIsAnalysisOpen(true);
+        setIsAnalyzing(true);
+        try {
+            // Get current inventory item names
+            const itemNames = inventory.map(item => item.name);
+            const response = await aiService.analyzeInventory(itemNames);
+
+            // Handle both suggestions array (standard) and suggestion string (requested)
+            // Merge suggestions array with raw suggestion text for the modal
+            const suggestions = response.data.suggestions || [];
+            if (response.data.suggestion && suggestions.length > 0) {
+                suggestions[0].suggestion = response.data.suggestion;
+            } else if (response.data.suggestion) {
+                suggestions.push({ title: 'AI Recommendation', suggestion: response.data.suggestion, matchPercent: 100 });
+            }
+
+            setAiSuggestions(suggestions);
+        } catch (error) {
+            console.error('Analysis failed:', error);
+            alert('Failed to run AI analysis. Please check your OpenAI API key in Settings.');
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const tabs = ['Pantry', 'Fridge', 'Freezer'];
 
@@ -53,7 +88,6 @@ const Inventory = () => {
     };
 
     const handleUpdateQty = (item, delta) => {
-        // Try to parse quantity if it's a number followed by unit
         const match = item.qty.match(/^(\d+(\.\d+)?)\s*(.*)$/);
         if (match) {
             const num = parseFloat(match[1]);
@@ -61,8 +95,6 @@ const Inventory = () => {
             const newNum = Math.max(0, num + delta);
             updateItem(item.id, { qty: `${newNum}${unit ? ' ' + unit : ''}` });
         } else {
-            // If it's not a simple number, we can't easily increment/decrement
-            // but we could just append if it's just a number string
             const num = parseFloat(item.qty);
             if (!isNaN(num)) {
                 updateItem(item.id, { qty: String(Math.max(0, num + delta)) });
@@ -75,20 +107,47 @@ const Inventory = () => {
         setTimeout(() => setSuccessMessage(''), 3000);
     };
 
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
     // Filter items by active tab and global debounced search query
-    const filteredItems = inventory.filter(item => {
-        const matchesTab = item.location === activeTab;
-        const matchesSearch = item.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-            item.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
-        return matchesTab && matchesSearch;
-    });
+    const filteredItems = useMemo(() => {
+        let items = inventory.filter(item => {
+            const matchesTab = item.location === activeTab;
+            const matchesSearch = item.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                item.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+            return matchesTab && matchesSearch;
+        });
+
+        // Apply Sorting
+        return items.sort((a, b) => {
+            let aVal = a[sortConfig.key];
+            let bVal = b[sortConfig.key];
+
+            if (sortConfig.key === 'expiry') {
+                aVal = aVal ? new Date(aVal).getTime() : Infinity;
+                bVal = bVal ? new Date(bVal).getTime() : Infinity;
+            }
+
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [inventory, activeTab, debouncedSearchQuery, sortConfig]);
 
     // Stats for dashboard
-    const stats = {
-        total: inventory.length,
-        expiringSoon: inventory.filter(i => i.status === 'Expiring Soon').length,
-        expired: inventory.filter(i => i.status === 'Expired').length
-    };
+    const stats = useMemo(() => {
+        return {
+            total: inventory.length,
+            expiringSoon: inventory.filter(i => i.status === 'Expiring Soon').length,
+            expired: inventory.filter(i => i.status === 'Expired').length
+        };
+    }, [inventory]);
 
     return (
         <div className="space-y-6 relative">
@@ -105,13 +164,22 @@ const Inventory = () => {
                     <h1 className="text-2xl font-bold text-gray-800">Inventory Management</h1>
                     <p className="text-gray-500 mt-1">Track pantry, fridge, and freezer items</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-primary text-white px-5 py-2.5 rounded-lg font-medium shadow-sm hover:bg-emerald-600 transition-colors flex items-center justify-center"
-                >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Add Item
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleAnalyze}
+                        className="bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-lg font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors flex items-center group"
+                    >
+                        <Sparkles className="w-4 h-4 mr-2 group-hover:scale-125 transition-transform" />
+                        AI Analyst
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-primary text-white px-5 py-2.5 rounded-lg font-medium shadow-sm hover:bg-emerald-600 transition-colors flex items-center justify-center"
+                    >
+                        <Plus className="w-5 h-5 mr-2" />
+                        Add Item
+                    </button>
+                </div>
             </div>
 
             {/* Stats Bar */}
@@ -120,13 +188,13 @@ const Inventory = () => {
                     <p className="text-sm text-gray-500">Total Items</p>
                     <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-200 bg-amber-50">
-                    <p className="text-sm text-amber-600">Expiring Soon</p>
-                    <p className="text-2xl font-bold text-amber-600">{stats.expiringSoon}</p>
+                <div className={`bg-white p-4 rounded-xl shadow-sm border transition-colors ${stats.expiringSoon > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
+                    <p className={`text-sm ${stats.expiringSoon > 0 ? 'text-amber-600' : 'text-gray-500'}`}>Expiring Soon</p>
+                    <p className={`text-2xl font-bold ${stats.expiringSoon > 0 ? 'text-amber-600' : 'text-gray-800'}`}>{stats.expiringSoon}</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-red-200 bg-red-50">
-                    <p className="text-sm text-red-600">Expired</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.expired}</p>
+                <div className={`bg-white p-4 rounded-xl shadow-sm border transition-colors ${stats.expired > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+                    <p className={`text-sm ${stats.expired > 0 ? 'text-red-600' : 'text-gray-500'}`}>Expired</p>
+                    <p className={`text-2xl font-bold ${stats.expired > 0 ? 'text-red-600' : 'text-gray-800'}`}>{stats.expired}</p>
                 </div>
             </div>
 
@@ -164,10 +232,16 @@ const Inventory = () => {
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Item</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                                <div className="flex items-center gap-1">Item <ArrowUpDown className="w-3 h-3" /></div>
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('category')}>
+                                <div className="flex items-center gap-1">Category <ArrowUpDown className="w-3 h-3" /></div>
+                            </th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Quantity</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Expiry Date</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('expiry')}>
+                                <div className="flex items-center gap-1">Expiry Date <ArrowUpDown className="w-3 h-3" /></div>
+                            </th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                         </tr>
@@ -194,15 +268,9 @@ const Inventory = () => {
                                         </button>
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-gray-600">{item.expiry ? new Date(item.expiry).toLocaleDateString() : 'N/A'}</td>
+                                <td className="px-6 py-4 text-gray-600 text-sm">{item.expiry ? new Date(item.expiry).toLocaleDateString() : 'N/A'}</td>
                                 <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${item.status === 'Good' ? 'bg-emerald-100 text-emerald-700' :
-                                        item.status === 'Expiring Soon' ? 'bg-amber-100 text-amber-700' :
-                                            'bg-red-100 text-red-700'
-                                        }`}>
-                                        {item.status === 'Expiring Soon' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                        {item.status}
-                                    </span>
+                                    <ExpiryBadge expiryDate={item.expiry} />
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">
@@ -353,6 +421,13 @@ const Inventory = () => {
                     </div>
                 </div>
             )}
+            {/* AI Analysis Modal */}
+            <AIAnalysisModal
+                isOpen={isAnalysisOpen}
+                onClose={() => setIsAnalysisOpen(false)}
+                suggestions={aiSuggestions}
+                isLoading={isAnalyzing}
+            />
         </div>
     );
 };

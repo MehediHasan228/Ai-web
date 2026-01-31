@@ -1,49 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Check, ShoppingBag, MoreVertical, X, Trash2, PieChart } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip } from 'recharts';
+import { groceryService } from '../services/api';
 
 const Grocery = () => {
-    const [items, setItems] = useState([
-        { id: 1, name: 'Almond Milk', category: 'Dairy & Alternatives', isBought: false, price: 4.50 },
-        { id: 2, name: 'Spinach', category: 'Produce', isBought: false, price: 2.99 },
-        { id: 3, name: 'Eggs (Dozen)', category: 'Dairy & Alternatives', isBought: true, price: 5.20 },
-        { id: 4, name: 'Chicken Breast', category: 'Meat & Poultry', isBought: false, price: 12.50 },
-        { id: 5, name: 'Brown Rice', category: 'Grains', isBought: false, price: 3.75 },
-    ]);
+    const [items, setItems] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
     const [newItem, setNewItem] = useState({ name: '', category: 'Produce', price: '' });
 
-    const toggleItem = (id) => {
-        setItems(items.map(item =>
-            item.id === id ? { ...item, isBought: !item.isBought } : item
-        ));
-    };
+    // Fetch items on mount
+    useEffect(() => {
+        fetchItems();
+    }, []);
 
-    const clearCompleted = () => {
-        if (window.confirm("Clear all bought items?")) {
-            setItems(items.filter(i => !i.isBought));
+    const fetchItems = async () => {
+        setIsLoading(true);
+        try {
+            const response = await groceryService.getAll();
+            setItems(response.data);
+        } catch (error) {
+            console.error('Failed to fetch grocery items:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const addItem = (e) => {
-        e.preventDefault();
-        if (!newItem.name) return;
-        setItems([...items, {
-            id: Date.now(),
-            name: newItem.name,
-            category: newItem.category,
-            isBought: false,
-            price: parseFloat(newItem.price) || 0
-        }]);
-        setNewItem({ name: '', category: 'Produce', price: '' });
-        setIsAddModalOpen(false);
+    const toggleItem = async (id) => {
+        try {
+            await groceryService.toggle(id);
+            setItems(items.map(item =>
+                item.id === id ? { ...item, isBought: !item.isBought } : item
+            ));
+        } catch (error) {
+            console.error('Failed to toggle item:', error);
+        }
     };
 
-    const deleteItem = (id) => {
-        setItems(items.filter(i => i.id !== id));
-    }
+    const clearCompleted = async () => {
+        if (window.confirm("Clear all bought items?")) {
+            try {
+                await groceryService.clearCompleted();
+                setItems(items.filter(i => !i.isBought));
+            } catch (error) {
+                console.error('Failed to clear completed items:', error);
+            }
+        }
+    };
+
+    const addItem = async (e) => {
+        e.preventDefault();
+        if (!newItem.name) return;
+        try {
+            const response = await groceryService.create({
+                name: newItem.name,
+                category: newItem.category,
+                price: parseFloat(newItem.price) || 0
+            });
+            setItems([...items, response.data]);
+            setNewItem({ name: '', category: 'Produce', price: '' });
+            setIsAddModalOpen(false);
+        } catch (error) {
+            console.error('Failed to add item:', error);
+        }
+    };
+
+    const deleteItem = async (id) => {
+        try {
+            await groceryService.delete(id);
+            setItems(items.filter(i => i.id !== id));
+        } catch (error) {
+            console.error('Failed to delete item:', error);
+        }
+    };
 
     const categories = [...new Set(items.map(i => i.category))];
     const remainingItems = items.filter(i => !i.isBought);
@@ -80,41 +111,50 @@ const Grocery = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main List Area */}
                 <div className="lg:col-span-2 space-y-6">
-                    {categories.map(category => (
-                        <div key={category} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                            <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                                <h3 className="font-semibold text-gray-700">{category}</h3>
-                                <span className="text-xs font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-                                    {items.filter(i => i.category === category && !i.isBought).length} items
-                                </span>
-                            </div>
-                            <div className="divide-y divide-gray-100">
-                                {items.filter(i => i.category === category).map(item => (
-                                    <div
-                                        key={item.id}
-                                        className={`px-6 py-4 flex items-center justify-between group transition-colors ${item.isBought ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}
-                                    >
-                                        <div className="flex items-center cursor-pointer flex-1" onClick={() => toggleItem(item.id)}>
-                                            <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-colors ${item.isBought ? 'bg-primary border-primary' : 'border-gray-300'
-                                                }`}>
-                                                {item.isBought && <Check className="w-3.5 h-3.5 text-white" />}
-                                            </div>
-                                            <div>
-                                                <span className={`block ${item.isBought ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>
-                                                    {item.name}
-                                                </span>
-                                                <span className="text-xs text-gray-400">${item.price.toFixed(2)}</span>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => deleteItem(item.id)} className="text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-2">
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                    {isLoading ? (
+                        <div className="bg-white rounded-xl p-20 flex flex-col items-center justify-center border border-gray-100 shadow-sm">
+                            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            <p className="mt-4 text-gray-500 font-medium">Loading your items...</p>
                         </div>
-                    ))}
-                    {items.length === 0 && <div className="text-center p-10 text-gray-400">Your list is empty! Time to add some milk? 🥛</div>}
+                    ) : (
+                        <>
+                            {categories.map(category => (
+                                <div key={category} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                                        <h3 className="font-semibold text-gray-700">{category}</h3>
+                                        <span className="text-xs font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                            {items.filter(i => i.category === category && !i.isBought).length} items
+                                        </span>
+                                    </div>
+                                    <div className="divide-y divide-gray-100">
+                                        {items.filter(i => i.category === category).map(item => (
+                                            <div
+                                                key={item.id}
+                                                className={`px-6 py-4 flex items-center justify-between group transition-colors ${item.isBought ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}
+                                            >
+                                                <div className="flex items-center cursor-pointer flex-1" onClick={() => toggleItem(item.id)}>
+                                                    <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-colors ${item.isBought ? 'bg-primary border-primary' : 'border-gray-300'
+                                                        }`}>
+                                                        {item.isBought && <Check className="w-3.5 h-3.5 text-white" />}
+                                                    </div>
+                                                    <div>
+                                                        <span className={`block ${item.isBought ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>
+                                                            {item.name}
+                                                        </span>
+                                                        <span className="text-xs text-gray-400">${item.price.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => deleteItem(item.id)} className="text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all p-2">
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            {items.length === 0 && <div className="text-center p-10 text-gray-400">Your list is empty! Time to add some milk? 🥛</div>}
+                        </>
+                    )}
                 </div>
 
                 {/* Summary / Quick Actions */}

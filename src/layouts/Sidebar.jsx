@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ChefHat, ShoppingCart, Settings, List, Activity, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, ChefHat, ShoppingCart, Settings, List, Activity, LogOut, X, Database } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useUI } from '../context/UIContext';
 import { useAuth } from '../context/AuthContext';
@@ -8,18 +8,21 @@ import { useAuth } from '../context/AuthContext';
 const Sidebar = () => {
     const { user } = useUser();
     const { isSidebarOpen, isMobile, closeSidebar, setIsSidebarOpen } = useUI();
-    const { logout } = useAuth();
+    const { logout, authUser } = useAuth();
     const navigate = useNavigate();
+
+    const role = authUser?.role?.toLowerCase() || 'user';
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-        { icon: Users, label: 'Users', path: '/users' },
+        { icon: Users, label: 'Users', path: '/users', allowedRoles: ['admin', 'manager'] },
         { icon: ChefHat, label: 'Recipes', path: '/recipes' },
         { icon: List, label: 'Inventory Data', path: '/inventory' },
         { icon: ShoppingCart, label: 'Grocery Lists', path: '/grocery' },
-        { icon: Activity, label: 'AI Controls', path: '/ai-controls' },
+        { icon: Activity, label: 'AI Controls', path: '/ai-controls', allowedRoles: ['admin', 'manager'] },
+        { icon: Database, label: 'Database Panel', path: '/database', allowedRoles: ['admin'] },
         { icon: Settings, label: 'Settings', path: '/settings' },
-    ];
+    ].filter(item => !item.allowedRoles || item.allowedRoles.includes(role));
 
     const handleLogout = () => {
         if (window.confirm('Are you sure you want to logout?')) {
@@ -58,7 +61,7 @@ const Sidebar = () => {
                     <div className="flex items-center">
                         <div className="w-8 h-8 bg-primary rounded-lg mr-3 flex items-center justify-center font-bold text-white flex-shrink-0">S</div>
                         <span className={`text-xl font-bold tracking-wide transition-opacity duration-300 ${!isSidebarOpen && !isMobile ? 'opacity-0 hidden' : 'opacity-100'}`}>
-                            Savora Admin
+                            {role === 'admin' ? 'Savora Admin' : 'Savora Dashboard'}
                         </span>
                     </div>
 
@@ -109,8 +112,8 @@ const Sidebar = () => {
                         >
                             <div className="relative flex-shrink-0">
                                 <img
-                                    src={user.avatar}
-                                    alt="Admin Avatar"
+                                    src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'Admin')}&background=random&color=fff`}
+                                    alt="User Avatar"
                                     className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-primary transition-colors"
                                 />
                                 <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-dark"></div>

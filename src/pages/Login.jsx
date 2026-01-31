@@ -138,10 +138,10 @@ const Login = () => {
                         <p className="text-center text-xs text-gray-500 mb-3">Demo Credentials</p>
                         <div className="bg-white/5 rounded-lg p-3 text-center">
                             <p className="text-sm text-gray-400">
-                                <span className="text-gray-500">Email:</span> <span className="text-white">admin@savora.app</span>
+                                <span className="text-gray-500">Email:</span> <span className="text-white">admin@savora.com</span>
                             </p>
                             <p className="text-sm text-gray-400 mt-1">
-                                <span className="text-gray-500">Password:</span> <span className="text-white">any password</span>
+                                <span className="text-gray-500">Password:</span> <span className="text-white">demo123</span>
                             </p>
                         </div>
                     </div>

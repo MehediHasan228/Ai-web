@@ -2,8 +2,8 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated, isLoading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles }) => {
+    const { isAuthenticated, isLoading, authUser } = useAuth();
     const location = useLocation();
 
     // Show loading state while checking auth
@@ -21,6 +21,11 @@ const ProtectedRoute = ({ children }) => {
     // Redirect to login if not authenticated
     if (!isAuthenticated) {
         return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // Check role if allowedRoles is provided
+    if (allowedRoles && !allowedRoles.includes(authUser?.role?.toLowerCase())) {
+        return <Navigate to="/" replace />;
     }
 
     // Render protected content

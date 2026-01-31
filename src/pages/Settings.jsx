@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Bell, Key, Check, Camera, LogOut, Eye, EyeOff, ChefHat, Clock, Flame, X } from 'lucide-react';
 import { useUser } from '../context/UserContext';
+import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/api';
+import { compressImage } from '../utils/imageUtils';
 
 const Settings = () => {
-    const { user, updateProfile, apiKeys, updateApiKeys, notifications, updateNotifications, userPreferences, updateUserPreferences, logout } = useUser();
+    const { user, apiKeys, updateApiKeys, notifications, updateNotifications, userPreferences, updateUserPreferences, logout } = useUser();
+    const { updateUser } = useAuth();
 
     // --- Profile State ---
     const [profileData, setProfileData] = useState({ ...user });
@@ -35,33 +39,57 @@ const Settings = () => {
     }, [user, apiKeys, notifications, userPreferences]);
 
     // Handlers
-    const handleProfileSave = () => {
+    const handleProfileSave = async () => {
         setIsProfileSaving(true);
-        setTimeout(() => {
-            updateProfile(profileData);
-            setIsProfileSaving(false);
+        try {
+            const response = await authService.updateProfile({
+                name: profileData.name,
+                email: profileData.email,
+                avatar: profileData.avatar
+            });
+            updateUser(response.data);
             alert("Profile updated successfully!");
-        }, 800);
-    };
-
-    const handleAvatarChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProfileData(prev => ({ ...prev, avatar: reader.result }));
-            };
-            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            alert(error.response?.data?.message || 'Failed to update profile');
+        } finally {
+            setIsProfileSaving(false);
         }
     };
 
-    const handleKeysSave = () => {
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const compressed = await compressImage(file);
+                setProfileData(prev => ({ ...prev, avatar: compressed }));
+            } catch (err) {
+                console.error("Compression failed:", err);
+                // Fallback to original if compression fails
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setProfileData(prev => ({ ...prev, avatar: reader.result }));
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    };
+
+    const handleKeysSave = async () => {
         setIsKeysSaving(true);
-        setTimeout(() => {
-            updateApiKeys(keysData);
-            setIsKeysSaving(false);
+        try {
+            const response = await authService.updateProfile({
+                openaiKey: keysData.openai,
+                spoonacularKey: keysData.spoonacular
+            });
+            updateUser(response.data);
             alert("API Keys updated successfully!");
-        }, 800);
+        } catch (error) {
+            console.error('Failed to update keys:', error);
+            alert(error.response?.data?.message || 'Failed to update keys');
+        } finally {
+            setIsKeysSaving(false);
+        }
     };
 
     const handleNotifChange = (key) => {
@@ -70,13 +98,18 @@ const Settings = () => {
         updateNotifications(newData);
     };
 
-    const handlePrefsSave = () => {
+    const handlePrefsSave = async () => {
         setIsPrefsSaving(true);
-        setTimeout(() => {
-            updateUserPreferences(prefsData);
+        try {
+            const response = await authService.updateProfile({ preferences: prefsData });
+            updateUser(response.data);
+            alert("Preferences saved successfully!");
+        } catch (error) {
+            console.error('Failed to save preferences:', error);
+            alert('Failed to save preferences');
+        } finally {
             setIsPrefsSaving(false);
-            alert("Recipe preferences updated! Match scores will recalculate.");
-        }, 800);
+        }
     };
 
     const toggleDietaryPref = (pref) => {
@@ -116,7 +149,7 @@ const Settings = () => {
                         <div className="flex flex-col items-center space-y-3">
                             <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                                 <img
-                                    src={profileData.avatar}
+                                    src={profileData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=random&color=fff`}
                                     alt="Profile"
                                     className="w-24 h-24 rounded-full object-cover border-4 border-gray-50 group-hover:border-primary/20 transition-all"
                                 />
@@ -190,8 +223,8 @@ const Settings = () => {
                                     key={pref}
                                     onClick={() => toggleDietaryPref(pref)}
                                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${(prefsData.dietaryPreferences || []).includes(pref)
-                                            ? 'bg-primary text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-primary text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {pref}
@@ -210,8 +243,8 @@ const Settings = () => {
                                     key={cuisine}
                                     onClick={() => toggleCuisinePref(cuisine)}
                                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${(prefsData.cuisinePreferences || []).includes(cuisine)
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {cuisine}

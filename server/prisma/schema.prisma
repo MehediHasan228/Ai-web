@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("admin")
+  status    String   @default("Active")
+  plan      String   @default("Free")
+  avatar    String?  @db.LongText
+  openaiKey String?
+  spoonacularKey String?
+  preferences Json?
+  items        Item[]
+  recipes      Recipe[]
+  groceryItems GroceryItem[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Item {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String   @default("General")
+  qty       String
+  expiry    String   @default("")
+  status    String   @default("Fresh")
+  location  String   @default("Pantry")
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Recipe {
+  id           Int      @id @default(autoincrement())
+  title        String
+  cuisine      String
+  time         Int
+  calories     Int
+  image        String
+  ingredients  String   // JSON string of ingredients
+  instructions String
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GroceryItem {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  isBought  Boolean  @default(false)
+  price     Float    @default(0)
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

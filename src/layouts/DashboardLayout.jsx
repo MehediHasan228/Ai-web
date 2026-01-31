@@ -12,7 +12,8 @@ const pageTitles = {
     '/inventory': 'Inventory Management',
     '/grocery': 'Grocery Lists',
     '/ai-controls': 'AI Controls',
-    '/settings': 'Settings'
+    '/settings': 'Settings',
+    '/database': 'Database Panel'
 };
 
 const DashboardLayout = () => {

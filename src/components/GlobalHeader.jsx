@@ -170,8 +170,8 @@ const GlobalHeader = ({ title = 'Dashboard' }) => {
                                                 className={`w-full px-5 py-4 text-left border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors flex gap-4 ${!notif.read ? 'bg-primary/5' : ''}`}
                                             >
                                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${notif.type === 'recipe' ? 'bg-amber-100 text-amber-600' :
-                                                        notif.type === 'inventory' ? 'bg-blue-100 text-blue-600' :
-                                                            'bg-purple-100 text-purple-600'
+                                                    notif.type === 'inventory' ? 'bg-blue-100 text-blue-600' :
+                                                        'bg-purple-100 text-purple-600'
                                                     }`}>
                                                     <Bell className="w-5 h-5" />
                                                 </div>
@@ -211,13 +211,15 @@ const GlobalHeader = ({ title = 'Dashboard' }) => {
                         className={`flex items-center gap-2 p-1.5 rounded-xl transition-all ${showProfileMenu ? 'bg-gray-100' : 'hover:bg-gray-100'}`}
                     >
                         <img
-                            src={user?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'}
+                            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random&color=fff`}
                             alt="Profile"
                             className="w-8 h-8 rounded-lg object-cover border-2 border-white shadow-sm"
                         />
                         <div className="hidden lg:block text-left mr-1">
-                            <span className="block text-xs font-bold text-gray-900 uppercase tracking-wider leading-none mb-0.5">{user?.name || 'Admin'}</span>
-                            <span className="block text-[10px] text-gray-400 font-medium leading-none">Super Administrator</span>
+                            <span className="block text-xs font-bold text-gray-900 uppercase tracking-wider leading-none mb-0.5">{user?.name || 'User'}</span>
+                            <span className="block text-[10px] text-gray-400 font-medium leading-none">
+                                {user?.role?.toLowerCase() === 'admin' ? 'Super Administrator' : `${user?.plan || 'Free'} Member`}
+                            </span>
                         </div>
                         <ChevronDown className={`w-4 h-4 text-gray-400 hidden md:block transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
                     </button>
