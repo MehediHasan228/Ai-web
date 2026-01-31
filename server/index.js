@@ -11,7 +11,9 @@ const app = express();
 // Middleware
 app.use(cors({
     origin: ['https://mehedihasan228.github.io', 'http://localhost:5173'],
-    credentials: true
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));

@@ -23,7 +23,7 @@ function App() {
       <UserProvider>
         <InventoryProvider>
           <UIProvider>
-            <BrowserRouter>
+            <BrowserRouter basename="/Ai-web">
               <Routes>
                 {/* Public Route */}
                 <Route path="/login" element={<Login />} />
