@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Verified as PostgreSQL for Render deployment
+  provider = "postgresql" // DEPLOY_ID: PG_SYNC_FINAL_CHECK
   url      = env("DATABASE_URL")
 }
 
