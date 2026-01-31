@@ -1,0 +1,73 @@
+{
+  "hash": "3d5bce68",
+  "configHash": "8abb0e12",
+  "lockfileHash": "cdc4fd52",
+  "browserHash": "afc7c7bc",
+  "optimized": {
+    "react": {
+      "src": "../../../savora-deps/node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "c8ff3a90",
+      "needsInterop": true
+    },
+    "react-dom": {
+      "src": "../../../savora-deps/node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "0867310e",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../../savora-deps/node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "ed757f33",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../../savora-deps/node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "d7dbca21",
+      "needsInterop": true
+    },
+    "axios": {
+      "src": "D:/savora-admin/node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "8ad88974",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "D:/savora-admin/node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "8f4f763a",
+      "needsInterop": false
+    },
+    "react-dom/client": {
+      "src": "../../../savora-deps/node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "9711cf1a",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "D:/savora-admin/node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "2b066089",
+      "needsInterop": false
+    },
+    "recharts": {
+      "src": "D:/savora-admin/node_modules/recharts/es6/index.js",
+      "file": "recharts.js",
+      "fileHash": "d978d349",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-ZOPPFTZF": {
+      "file": "chunk-ZOPPFTZF.js"
+    },
+    "chunk-RZUXYSVO": {
+      "file": "chunk-RZUXYSVO.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
+    }
+  }
+}
