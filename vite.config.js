@@ -5,6 +5,8 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // এই লাইনটি অবশ্যই থাকতে হবে যাতে GitHub Pages আপনার assets ফোল্ডার খুঁজে পায়
+  base: '/Ai-web/', 
   cacheDir: 'C:/savora-src/.vite',
   resolve: {
     alias: {
@@ -33,5 +35,8 @@ export default defineConfig({
         'C:/savora-src'
       ]
     }
+  },
+  build: {
+    outDir: 'dist',
   }
 })
