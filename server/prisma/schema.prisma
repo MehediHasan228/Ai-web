@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,7 +21,7 @@ model User {
   avatar    String?
   openaiKey String?
   spoonacularKey String?
-  preferences String?
+  preferences Json?
   items        Item[]
   recipes      Recipe[]
   groceryItems GroceryItem[]
